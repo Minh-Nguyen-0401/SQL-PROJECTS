@@ -90,3 +90,92 @@ FROM or_cust
 WHERE cust_order_ranking =9;
        
 
+-- Find the top performing salespeople in the first quarter of the previous year, including total sales and number of orders.
+SELECT 
+    employeeid,
+    SUM(quantity * unitprice) AS revenue,
+    COUNT(DISTINCT s.orderid) AS total_orders
+FROM
+    salesorder s
+        JOIN
+    orderdetail od ON s.orderid = od.orderid
+WHERE
+    YEAR(orderdate) = (SELECT 
+            YEAR(MAX(orderdate)) - 1
+        FROM
+            salesorder)
+        AND QUARTER(orderdate) IN (1 , 2)
+GROUP BY employeeid
+ORDER BY revenue DESC;
+-- Two oustanding performers in the 1st quarter of the previous year has the ID of 4 and 3, respectively
+
+SELECT 
+    *
+FROM
+    employee e
+        JOIN
+    emp_gender eg ON e.employeeid = eg.employeeid
+WHERE
+    e.employeeid in (4 , 3);
+/* -> Both of them are female, which is not surprising since the majority of the comp revenue stems from them.
+Another noticeable feature can be that one of them is currently a sales manager while the other is just a sales prep despite having slightly better performance over the quarter. 
+*/
+
+-- Find the number of male and female employees in the company
+SET @a=0,@b=0,@c=0,@d=0;
+
+SELECT Count(male) as male_count, count(female) as female_count FROM(
+SELECT firstname, lastname, titleofcourtesy,
+	CASE
+		WHEN titleOfCourtesy LIKE "Ms." OR titleOfCourtesy LIKE "Mrs." THEN (@a:=@a+1)
+        WHEN titleOfCourtesy LIKE "Mr." THEN (@b:=@b+1)
+        ELSE (@c:=@c+1) END as count_title,
+    CASE WHEN titleOfCourtesy LIKE "Ms." OR titleOfCourtesy LIKE "Mrs." THEN 1 ELSE 0 end as female,
+	CASE WHEN titleOfCourtesy LIKE 'Mr.' THEN 1 ELSE 0 end as male
+FROM employee) a
+;
+
+-- Find the total sales and total orders of employees grouped by gender. Is there any noticeable difference?
+CREATE TEMPORARY TABLE emp_gender AS (
+SELECT employeeid,
+		CASE WHEN titleofcourtesy like 'Mr.' THEN 'male'
+        WHEN titleofcourtesy like 'Mrs.' OR titleofcourtesy  like 'Ms.' THEN 'female'
+        ELSE 'undefined' END AS gender
+FROM employee);
+
+SELECT 
+    gender,
+    SUM(quantity * unitprice) AS total_sales,
+    COUNT(s.orderid) AS total_order
+FROM
+    emp_gender eg
+        JOIN
+    salesorder s ON s.employeeid = eg.employeeid
+        JOIN
+    orderdetail od ON od.orderid = s.orderid
+GROUP BY gender
+ORDER BY total_sales DESC;
+
+-- -> One key insights deduced from the figures is that female employees enjoy much higher sale revenue, with their figures triple those of male's in both total orders and revenues.
+
+-- Find the average revenue for orders categorised by gender
+With order_sale as (
+SELECT 
+    eg.employeeid,
+    eg.gender,
+    s.orderid,
+    SUM(quantity * unitprice) AS order_value
+FROM
+    emp_gender eg
+        JOIN
+    salesorder s ON eg.employeeid = s.employeeid
+        JOIN
+    orderdetail od ON od.orderid = s.orderid
+GROUP BY eg.employeeid , eg.gender , s.orderid)
+SELECT gender, AVG(order_value) as avg_order_value
+FROM order_sale 
+GROUP BY gender
+ORDER BY avg_order_value DESC;
+-- However, the average revenue for each order of female are slightly better than female's, disacknowledging the figure for undefined gender.
+
+
