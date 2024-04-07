@@ -179,3 +179,37 @@ ORDER BY avg_order_value DESC;
 -- However, the average revenue for each order of female are slightly better than female's, disacknowledging the figure for undefined gender.
 
 
+-- What is the distribution of shippers? Are there any shippers who share common cities?
+SELECT 
+    shipperid, COUNT(*) AS total_orders
+FROM
+    salesorder
+GROUP BY shipperid;
+
+SELECT 
+    shipperid, shipCity, COUNT(shipCity) AS total_orders
+FROM
+    salesorder
+GROUP BY shipperid , shipCity;
+
+
+SELECT shipCity,
+	COUNT(DISTINCT shipperId) OVER(PARTITION BY shipCity) as shipper_count,
+       shipperid,
+       COUNT(orderid) OVER (PARTITION BY shipCity) as order_count
+FROM salesorder
+ORDER BY shipCity;
+
+SELECT SUM(share) FROM (
+SELECT shipCity, COUNT(orderid) as count_order, COUNT(orderid)/(SELECT COUNT(orderid) FROM salesorder)*100 as share
+FROM salesorder
+GROUP BY shipCity
+ORDER BY count_order DESC
+LIMIT 5)a;
+
+SELECT shipCity, COUNT(orderid) as count_order, COUNT(orderid)/(SELECT COUNT(orderid) FROM salesorder)*100 as share
+FROM salesorder
+GROUP BY shipCity
+ORDER BY count_order DESC;
+
+-- Each city is serviced by all three shipper with Rio de Janeiro, London, Sao Paulo, Boise, and Graz sharing the highest number of orders (accounting for a total of around 20% among 70 cities)
